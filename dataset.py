@@ -152,7 +152,7 @@ class Dataset():
                 src_idx = 0
             if dst_idx >= batch_size:
                 dst_idx = 0
-                yield X
+                yield X, X
 
     # Function definition taken from keras source code
     def _apply_affine_distortion(self, x):
