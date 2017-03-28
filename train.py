@@ -8,29 +8,6 @@ import random
 import os
 import json
 
-seed = 1337
-
-class Reset_Random(Callback):
-    # def on_train_begin(self, logs={}):
-    #     return
-    # 
-    # def on_train_end(self, logs={}):
-    #     return
- 
-    def on_epoch_begin(self, epoch, logs={}):
-        np.random.seed(seed)  
-        return
- 
-    # def on_epoch_end(self, epoch, logs={}):
-    #     return
-    # 
-    # def on_batch_begin(self, batch, logs={}):
-    #     return
-    # 
-    # def on_batch_end(self, batch, logs={}):
-    #     self.losses.append(logs.get('loss'))
-    #     return   
-
 class SolverWrapper():
     def __init__(self, imdb, model_file, nb_epoch, batch_size, train_dir,
                  retrain, initial_epoch):
@@ -52,38 +29,6 @@ class SolverWrapper():
             self.net = create_network(self.input_dim)
             self.initial_epoch = 0
 
-    def create_training_pairs(self, x):
-        '''Positive and negative pair creation.
-        Alternates between positive and negative pairs.
-        '''
-        pairs = []; labels = []
-        
-        # Add two pairs. First pair = same sketch
-        # second pair = diferent sketches
-        num_sample = x.shape[0]
-        for idx, sample in enumerate(x):
-            #Add first pair
-            pairs += [[sample, sample]]
-            unusable_idx = [idx]
-            rand_idx = idx
-            
-            # Add second pair
-            while rand_idx in unusable_idx:
-                rand_idx = random.randrange(1, num_sample)
-            unusable_idx += [rand_idx]    
-            pairs += [[sample, x[rand_idx]]]
-
-            # Add labels
-            if 1:
-                labels += [1,0]
-            else: # Conditionally add third pair
-                while rand_idx in unusable_idx:
-                    rand_idx = random.randrange(1, num_sample)
-                unusable_idx += [rand_idx]    
-                pairs += [[x[rand_idx], sample]]
-                
-                labels += [1, 0, 0]
-        return np.array(pairs), np.array(labels)    
     
     def _dump_history(self, history, val_set_present, log_file_name):
         f = open(log_file_name, "w")
@@ -115,9 +60,7 @@ class SolverWrapper():
         num_train_sample = batch_size * np.ceil(self.imdb.get_num_train_sample() / float(batch_size)).astype('int32')
         num_val_sample = batch_size * np.ceil(self.imdb.get_num_val_sample() / float(batch_size)).astype('int32')
 
-        # For debugging purpose
-        if 1:
-            self.imdb.validate_dataset(self.batch_size)
+        self.imdb.validate_dataset(self.batch_size)
 
         # network definition
         model = create_network(self.input_dim)
@@ -126,11 +69,6 @@ class SolverWrapper():
         checkpointer = ModelCheckpoint(filepath=self.model_file,
                                        monitor='val_loss', verbose=1, save_best_only=True)
                                        
-        # reset_random = Reset_Random()
-
-        ## Reduce sample-count for debugging
-        # num_train_sample = 2* self.batch_size
-        # num_val_sample = self.batch_size
         hist = model.fit_generator(self.imdb.get_batch(batch_size, phase='train'),
                                    samples_per_epoch=num_train_sample,
                                    nb_epoch=self.nb_epoch,
