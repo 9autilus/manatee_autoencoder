@@ -1,5 +1,5 @@
 from __future__ import print_function
-from siamese_model import create_network
+from model_def import create_network
 from dataset import Dataset
 from keras.callbacks import ModelCheckpoint, Callback
 from keras.models import load_model
