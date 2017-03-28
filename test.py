@@ -82,7 +82,7 @@ class Test():
         val_samples = int(np.ceil(num_sketches / batch_size)) * batch_size
 
         vectors = self.net.predict_generator(
-            self.imdb.get_batch(batch_size, phase=sketch_set),
+            self.imdb.get_batch(batch_size, sketch_set=sketch_set),
             val_samples=val_samples)
 
         # Ignore the extra sketches introduced by generator

@@ -21,14 +21,6 @@ class Dataset():
 
         # Prepare sketch lists
         self.full_train_sketch_list = self._get_sketch_list('train')
-        train_split = 100 - self.val_split
-        # Divide between training and validation set
-        num_sketches_train = int((len(self.full_train_sketch_list) * train_split) / 100)
-        self.train_sketch_list = self.full_train_sketch_list[:num_sketches_train]
-        self.val_sketch_list = self.full_train_sketch_list[num_sketches_train:]
-        self.test_sketch_list = self._get_sketch_list('test')
-        self.limited_train_sketch_list = self.full_train_sketch_list
-
         self._print_dataset_config()
         
     def _print_dataset_config(self):
@@ -75,12 +67,20 @@ class Dataset():
         if not self.use_augmentation:
             self.num_additional_sketches = 0
 
+        train_split = 100 - self.val_split
+        # Divide between training and validation set
+        num_sketches_train = int((len(self.full_train_sketch_list) * train_split) / 100)
+        self.train_sketch_list = self.full_train_sketch_list[:num_sketches_train]
+        self.val_sketch_list = self.full_train_sketch_list[num_sketches_train:]
+
         self._print_train_config()
         
     def _print_train_config(self):
         return
 
     def prep_test(self, test_args):
+        self.test_sketch_list = self._get_sketch_list('test')
+        self.limited_train_sketch_list = self.full_train_sketch_list
         return
 
     def _get_sketch_list(self, phase):
@@ -115,9 +115,9 @@ class Dataset():
             sketch_list = self.train_sketch_list
         elif sketch_set == 'val_set':
             sketch_dir = self.train_dir
-            sketch_list = self.test_sketch_list
+            sketch_list = self.val_sketch_list
         elif sketch_set == 'test_set':
-            sketch_dir = self.train_dir
+            sketch_dir = self.test_dir
             sketch_list = self.test_sketch_list
         elif sketch_set == 'full_train_set':
             sketch_dir = self.train_dir
@@ -237,8 +237,8 @@ class Dataset():
 
     def validate_dataset(self, batch_size):
         num_sketches_to_dump = 10
-        print('Dumping sketches for debugging....')
         if 0:
+            print('Dumping sketches for debugging....')
             self._dump_sketces(self.train_dir, self.train_sketch_list, num_sketches_to_dump)
             self._dump_sketces(self.train_dir, self.val_sketch_list, num_sketches_to_dump)
             self._dump_sketces(self.test_dir, self.test_sketch_list, num_sketches_to_dump)

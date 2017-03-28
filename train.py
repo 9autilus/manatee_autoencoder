@@ -57,24 +57,22 @@ class SolverWrapper():
 
         # Make num_train_sample a multiple of batch_size to avoid warning:
         # "Epoch comprised more than `num_train_sample` samples" during training
-        num_train_sample = batch_size * np.ceil(self.imdb.get_num_train_sample() / float(batch_size)).astype('int32')
-        num_val_sample = batch_size * np.ceil(self.imdb.get_num_val_sample() / float(batch_size)).astype('int32')
+        num_train_sample = batch_size * np.ceil(len(self.imdb.train_sketch_list) / float(batch_size)).astype('int32')
+        num_val_sample = batch_size * np.ceil(len(self.imdb.val_sketch_list) / float(batch_size)).astype('int32')
 
         self.imdb.validate_dataset(self.batch_size)
 
-        # network definition
-        model = create_network(self.input_dim)
-        
         # Create check point callback
         checkpointer = ModelCheckpoint(filepath=self.model_file,
                                        monitor='val_loss', verbose=1, save_best_only=True)
                                        
-        hist = model.fit_generator(self.imdb.get_batch(batch_size, phase='train'),
-                                   samples_per_epoch=num_train_sample,
-                                   nb_epoch=self.nb_epoch,
-                                   validation_data=self.imdb.get_batch(batch_size, phase='val'),
-                                   nb_val_samples=num_val_sample,
-                                   callbacks=[checkpointer])
+        hist = self.net.fit_generator(
+            self.imdb.get_batch(batch_size, sketch_set='train_set'),
+            samples_per_epoch=num_train_sample,
+            nb_epoch=self.nb_epoch,
+            validation_data=self.imdb.get_batch(batch_size, sketch_set='val_set'),
+            nb_val_samples=num_val_sample,
+            callbacks=[checkpointer])
 
         self._dump_history(hist.history, True, 'history.log')
         print('Training complete. Saved model as: ', self.model_file)

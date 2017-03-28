@@ -15,7 +15,7 @@ K.set_image_dim_ordering('th')
 
 import argparse
 from train import train_net
-# from test import test_net
+from test import test_net
 
 default_store_model = 'model.h5'
 
@@ -94,5 +94,4 @@ if __name__ == '__main__':
             args.model, args.epochs,
             args.retrain, args.initial_epoch)
     else:
-        pass
-        # test_net(common_cfg_file, test_cfg_file, args.test_mode, args.model)
+        test_net(common_cfg_file, test_cfg_file, args.test_mode, args.model)
