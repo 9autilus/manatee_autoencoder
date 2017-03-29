@@ -8,7 +8,7 @@ def plot_model(model):
 
 def compile_network(model):
     rms = RMSprop(lr=0.001, decay=0.1)
-    model.compile(loss='binary_crossentropy', optimizer=rms, metrics=['accuracy'])
+    model.compile(loss='mse', optimizer=rms, metrics=['accuracy'])
     return model
 
 def create_network(input_dim):
@@ -31,7 +31,8 @@ def create_network(input_dim):
     # x = UpSampling2D((2, 2))(x)
     x = Convolution2D(16, 3, 3, activation='relu', border_mode='same')(encoded)
     x = UpSampling2D((2, 2))(x)
-    decoded = Convolution2D(1, 3, 3, activation='sigmoid', border_mode='same')(x)
+    # tanh non-linearity is required since input is in range (-1, +1)
+    decoded = Convolution2D(1, 3, 3, activation='tanh', border_mode='same')(x)
 
     model = Model(input_img, decoded)
     model = compile_network(model)
