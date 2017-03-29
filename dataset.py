@@ -144,8 +144,8 @@ class Dataset():
             sketch_name = sketch_list[src_idx]
             X[dst_idx] = self._get_sketch(os.path.join(sketch_dir, sketch_name)).reshape(img_shape)
 
-            if self.use_augmentation is True:
-                X[dst_idx] = self._apply_affine_distortion(X[dst_idx])
+            # if self.use_augmentation is True:
+            #     X[dst_idx] = self._apply_affine_distortion(X[dst_idx])
 
             src_idx += 1
             dst_idx += 1
