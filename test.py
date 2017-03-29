@@ -94,6 +94,7 @@ class Test():
         return 1
 
     def perform_testing(self):
+        # Testing
         test_set_vectors = self.test_on_set('test')
         train_set_vectors = self.test_on_set('full_train')
 
@@ -122,6 +123,46 @@ class Test():
 
         if self.dump_score_table:
             self._dump_score_table(score_table, ID1, ID2)
+
+    def dump_decoded_sketches(self, sketch_set):
+        if sketch_set == 'test_set':
+            sketch_list = self.imdb.test_sketch_list
+        elif sketch_set == 'full_train_set':
+            sketch_list = self.imdb.full_train_sketch_list
+        elif sketch_set == 'limited_train_set':
+            sketch_list = self.imdb.limited_train_sketch_list
+        else:
+            sketch_list = None
+            print('Error: Weird "sketch_set" arg:{0:s}'.format(sketch_set))
+            exit(0)
+
+        num_sketches = len(sketch_list)
+        batch_size = self.batch_size
+        val_samples = int(np.ceil(num_sketches / batch_size)) * batch_size
+        original = np.empty([val_samples, 1, self.imdb.ht, self.imdb.wd])
+        decoded = np.empty(original.shape)
+
+        gen = self.imdb.get_batch(batch_size, sketch_set)
+        for batch_id in range(int(val_samples/batch_size)):
+            x_batch, _ = next(gen)
+            original[batch_id*batch_size:(batch_id+1)*batch_size] = x_batch
+            decoded[batch_id*batch_size:(batch_id+1)*batch_size] = self.net.predict(x_batch)
+
+        # Ignore the extra sketches introduced by generator
+        original = original[0:num_sketches]
+        decoded = decoded[0:num_sketches]
+
+        for sketch_name, sketch1, sketch2 in zip(sketch_list, original, decoded):
+            sketch1 = (1 + sketch1) * 255 / 2.               # Scale to range [0, 255]
+            sketch1 = 255 - np.clip(sketch1, 0, 255)    # Clip to [0, 255] and invert
+            sketch2 = (1 + sketch2) * 255 / 2.          # Scale to range [0, 255]
+            sketch2 = 255 - np.clip(sketch2, 0, 255)    # Clip to [0, 255] and invert
+            # Place original-sketch on top of decoded-sketch
+            sketch = np.concatenate((sketch1, sketch2), axis=1)
+            # sketch.shape is (1, wd, wd) at this point
+            sketch = sketch.reshape(sketch.shape[1], sketch.shape[1])  # make shape (wd, wd)
+            sketch = sketch.astype('uint8')
+            cv2.imwrite(os.path.join('temp', 'decoded_' + sketch_name), sketch)
 
 
 def dump_train_test_sketch_pairs(X1, ID1, X2, ID2):
@@ -155,5 +196,9 @@ def test_net(common_cfg_file, test_cfg_file, test_mode, model_file):
     imdb = Dataset(dataset_args)
     imdb.prep_test(test_args)
 
-    sw = Test(imdb, model_file, dataset_args['train_dir'], dataset_args['test_dir'])
-    sw.perform_testing()
+    sw = Test(
+        imdb, model_file, test_args['batch_size'],
+        dataset_args['train_dir'], dataset_args['test_dir'])
+
+    sw.dump_decoded_sketches('test_set')
+    #sw.perform_testing()
