@@ -63,9 +63,9 @@ def parse_arguments():
 
         if args.test_mode:
             args.test_mode = int(args.test_mode)
-        if args.test_mode not in range(0, 3):
-            parser.print_help()
-            parser.error('For testing, test_mode must be 0,1 or 2.')
+        # if args.test_mode not in range(0, 3):
+        #     parser.print_help()
+        #     parser.error('For testing, test_mode must be 0,1 or 2.')
 
     if not args.model:
         print('No model specified. using default: ', default_store_model)
