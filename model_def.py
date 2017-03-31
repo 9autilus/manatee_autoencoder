@@ -1,6 +1,7 @@
 from keras.models import Model
 from keras.layers import Input, Convolution2D, MaxPooling2D, Dense, Flatten, Lambda, UpSampling2D
 from keras.optimizers import RMSprop
+from keras.models import load_model
 
 def plot_model(model):
     from keras.utils.visualize_util import plot
@@ -12,6 +13,7 @@ def compile_network(model):
     return model
 
 def create_network(input_dim):
+    encode_layer_id = 0
     '''Base network to be shared (eq. to feature extraction).
     '''
     input_img = Input(shape=input_dim)
@@ -35,9 +37,24 @@ def create_network(input_dim):
     model = Model(input_img, decoded)
     model = compile_network(model)
 
+    for i, l in enumerate(model.layers):
+        if l.output == encoded:
+            encode_layer_id = i
+
     print(model.summary())
 
     if 0:
         plot_model(model)
 
-    return model
+    return model, encode_layer_id
+
+
+def get_test_model(model_file, input_dim):
+    _, encode_layer_id = create_network(input_dim)
+    trained_model = load_model(model_file)
+
+    m = Model(trained_model.layers[0].input, trained_model.layers[encode_layer_id].output)
+    return m
+
+def get_trained_model(model_file):
+    m = load_model(model_file)

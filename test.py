@@ -2,13 +2,13 @@ from __future__ import print_function
 import sys #for flushing to stdout
 import numpy as np
 import cv2
-from keras.models import load_model
 import json
 import csv
 import os
 
 from dataset import Dataset
 from eval import eval_score_table
+from model_def import get_test_model, get_trained_model
 
 class Test():
     def __init__(self, imdb, model_file, batch_size, train_dir, test_dir):
@@ -19,11 +19,14 @@ class Test():
         self.batch_size = batch_size
         self.ranks = sorted([1, 5, 10, 20, 50, 100, 200])
         self.dump_score_table = True # For debugging
-        self.limit_search_space = True
+        self.limit_search_space = False
         
         # Use pre-trained model_file
         print('Reading model from disk: ', model_file)
-        self.net = load_model(model_file)
+        if 1:
+            self.net = get_test_model(model_file, self.input_dim)
+        else:
+            self.net = get_trained_model(model_file)
         return
 
     def _dump_score_table(self, score_table, row_IDs, col_IDs):
@@ -91,13 +94,13 @@ class Test():
 
 
     def _get_score(self, v1, v2):
-        dist = numpy.linalg.norm(v1 - v2)
+        dist = np.linalg.norm(v1 - v2)
         return dist
 
     def perform_testing(self):
         # Testing
-        test_set_vectors = self.test_on_set('test')
-        train_set_vectors = self.test_on_set('full_train')
+        test_set_vectors = self.test_on_set('test_set')
+        train_set_vectors = self.test_on_set('full_train_set')
 
         print('Computing rank-based accuracy... ')
         row_sketch_list = self.imdb.test_sketch_list
