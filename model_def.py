@@ -17,22 +17,20 @@ def create_network(input_dim):
     input_img = Input(shape=input_dim)
 
     x = Convolution2D(16, 3, 3, activation='relu', border_mode='same')(input_img)
-    # x = MaxPooling2D((2, 2), border_mode='same')(x)
-    # x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(x)
+    x = MaxPooling2D((2, 2), border_mode='same')(x)
+    x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(x)
     # x = MaxPooling2D((2, 2), border_mode='same')(x)
     # x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(x)
     encoded = MaxPooling2D((2, 2), border_mode='same')(x)
 
-    # at this point the representation is (4, 4, 8) i.e. 128-dimensional
-
     # x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(encoded)
     # x = UpSampling2D((2, 2))(x)
-    # x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(x)
-    # x = UpSampling2D((2, 2))(x)
-    x = Convolution2D(16, 3, 3, activation='relu', border_mode='same')(encoded)
+    x = Convolution2D(8, 3, 3, activation='relu', border_mode='same')(encoded)
     x = UpSampling2D((2, 2))(x)
-    # tanh non-linearity is required since input is in range (-1, +1)
+    x = Convolution2D(16, 3, 3, activation='relu', border_mode='same')(x)
+    x = UpSampling2D((2, 2))(x)
     decoded = Convolution2D(1, 3, 3, activation='tanh', border_mode='same')(x)
+    # tanh non-linearity is required since input is in range (-1, +1)
 
     model = Model(input_img, decoded)
     model = compile_network(model)

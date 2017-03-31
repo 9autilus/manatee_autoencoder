@@ -23,8 +23,8 @@ class Test():
         
         # Use pre-trained model_file
         print('Reading model from disk: ', model_file)
-        # self.net = load_model(model_file, custom_objects={'contrastive_loss':contrastive_loss})
         self.net = load_model(model_file)
+        return
 
     def _dump_score_table(self, score_table, row_IDs, col_IDs):
         import sys
@@ -91,7 +91,8 @@ class Test():
 
 
     def _get_score(self, v1, v2):
-        return 1
+        dist = numpy.linalg.norm(v1 - v2)
+        return dist
 
     def perform_testing(self):
         # Testing
@@ -200,5 +201,5 @@ def test_net(common_cfg_file, test_cfg_file, test_mode, model_file):
         imdb, model_file, test_args['batch_size'],
         dataset_args['train_dir'], dataset_args['test_dir'])
 
-    sw.dump_decoded_sketches('test_set')
-    #sw.perform_testing()
+    # sw.dump_decoded_sketches('test_set')
+    sw.perform_testing()
