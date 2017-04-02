@@ -8,6 +8,7 @@ import random
 import os
 import json
 
+
 class SolverWrapper():
     def __init__(self, imdb, model_file, nb_epoch, batch_size, train_dir,
                  retrain, initial_epoch):
@@ -19,39 +20,45 @@ class SolverWrapper():
         self.batch_size = batch_size
         self.retrain = retrain
         self.initial_epoch = initial_epoch
-        
+
         # network definition
         if self.retrain:
             # Use pre-trained model_file
             print('Reading model from disk: ', model_file)
             self.net = load_model(model_file)
         else:
-            self.net = create_network(self.input_dim)
+            self.net, _ = create_network(self.input_dim)
             self.initial_epoch = 0
 
-    
     def _dump_history(self, history, val_set_present, log_file_name):
         f = open(log_file_name, "w")
 
-        train_acc = history['acc']
+        accuracy_present = 'acc' in history.keys()
+
+        if accuracy_present:
+            train_acc = history['acc']
+
         train_loss = history['loss']
 
         if val_set_present:
-            val_acc = history['val_acc']
+            if accuracy_present:
+                val_acc = history['val_acc']
             val_loss = history['val_loss']
         else:
-            val_acc = [-1] * len(train_acc)
-            val_loss = val_acc
+            val_loss = -1
+            val_acc = [-1] * len(train_loss)
 
         f.write('Epoch  Train_loss  Train_acc  Val_loss  Val_acc  \n')
 
-        for i in range(len(train_acc)):
-            f.write('{0:d} {1:.2f} {2:.2f}% {3:.2f} {4:.2f}%\n'.format(
-                i, train_loss[i], 100 * train_acc[i], val_loss[i], 100 * val_acc[i]))
+        for i in range(len(train_loss)):
+            if accuracy_present:
+                f.write('{0:d} {1:f} {2:.2f}% {3:f} {4:.2f}%\n'.format(
+                    i, train_loss[i], 100 * train_acc[i], val_loss[i], 100 * val_acc[i]))
+            else:
+                f.write('{0:d} {1:f} {2:f}\n'.format(i, train_loss[i], val_loss[i]))
 
         print('Dumped history to file: {0:s}'.format(log_file_name))
 
-        
     def train_model(self):
         batch_size = self.batch_size
 
@@ -65,7 +72,7 @@ class SolverWrapper():
         # Create check point callback
         checkpointer = ModelCheckpoint(filepath=self.model_file,
                                        monitor='val_loss', verbose=1, save_best_only=True)
-                                       
+
         hist = self.net.fit_generator(
             self.imdb.get_batch(batch_size, sketch_set='train_set'),
             samples_per_epoch=num_train_sample,
@@ -77,6 +84,7 @@ class SolverWrapper():
         self._dump_history(hist.history, True, 'history.log')
         print('Training complete. Saved model as: ', self.model_file)
 
+
 def set_train_config(common_cfg_file, train_cfg_file, train_mode):
     with open(common_cfg_file) as f: dataset_config = json.load(f)
     with open(train_cfg_file) as f: train_config = json.load(f)
@@ -85,6 +93,7 @@ def set_train_config(common_cfg_file, train_cfg_file, train_mode):
     train_config['shear_range'] = np.pi * train_config['shear_range']
 
     return dataset_config, train_config
+
 
 def train_net(
         common_cfg_file,
@@ -103,7 +112,7 @@ def train_net(
 
     sw = SolverWrapper(
         imdb, model_file, nb_epoch, train_args['batch_size'],
-       dataset_args['train_dir'], retrain, initial_epoch)
+        dataset_args['train_dir'], retrain, initial_epoch)
 
     sw.train_model()
    

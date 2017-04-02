@@ -9,7 +9,7 @@ def plot_model(model):
 
 def compile_network(model):
     rms = RMSprop(lr=0.001, decay=0.1)
-    model.compile(loss='mse', optimizer=rms, metrics=['accuracy'])
+    model.compile(loss='mse', optimizer=rms)
     return model
 
 def create_network(input_dim):

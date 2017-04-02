@@ -80,7 +80,7 @@ class Dataset():
 
     def prep_test(self, test_args):
         self.test_sketch_list = self._get_sketch_list('test')
-        self.limited_train_sketch_list = self.full_train_sketch_list
+        self.limited_train_sketch_list = self._get_limited_search_space_list()
         return
 
     def _get_sketch_list(self, phase):
@@ -109,7 +109,23 @@ class Dataset():
         random.shuffle(sketch_list)
         return sketch_list
 
-    def get_batch(self, batch_size, sketch_set, limit_search_space=False):
+
+    def _get_limited_search_space_list(self):
+        base_list = self.test_sketch_list
+        sketch_dir = self.train_dir
+
+        ID = [x.split('.')[0].split('_')[0] for x in base_list]
+        ID = list(set(ID))  # Removing duplicates since test ID may have >1 sketches per manatee e.g. _A, _B
+        sketch_list = []
+
+        for idx, id in enumerate(ID):
+            # Workaround: Some IDs have different extension in test and train dir
+            sketch_with_path = glob.glob(os.path.join(sketch_dir, id + '.*'))[0]
+            sketch_list.append(os.path.basename(sketch_with_path))
+
+        return sketch_list
+
+    def get_batch(self, batch_size, sketch_set):
         if sketch_set == 'train_set':
             sketch_dir = self.train_dir
             sketch_list = self.train_sketch_list

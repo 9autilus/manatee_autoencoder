@@ -1,14 +1,15 @@
 from __future__ import print_function
-import sys #for flushing to stdout
+import sys  # for flushing to stdout
 import numpy as np
 import cv2
+from keras.models import load_model
 import json
 import csv
 import os
 
 from dataset import Dataset
 from eval import eval_score_table
-from model_def import get_test_model, get_trained_model
+
 
 class Test():
     def __init__(self, imdb, model_file, batch_size, train_dir, test_dir):
@@ -18,15 +19,11 @@ class Test():
         self.test_dir = test_dir
         self.batch_size = batch_size
         self.ranks = sorted([1, 5, 10, 20, 50, 100, 200])
-        self.dump_score_table = True # For debugging
-        self.limit_search_space = False
-        
+        self.dump_score_table = True  # For debugging
+
         # Use pre-trained model_file
         print('Reading model from disk: ', model_file)
-        if 1:
-            self.net = get_test_model(model_file, self.input_dim)
-        else:
-            self.net = get_trained_model(model_file)
+        self.net = load_model(model_file)
         return
 
     def _dump_score_table(self, score_table, row_IDs, col_IDs):
@@ -37,8 +34,8 @@ class Test():
             kwargs = {}
         else:
             access = 'wt'
-            kwargs = {'newline':''}    
-    
+            kwargs = {'newline': ''}
+
         score_table = np.array(score_table)
         dump = []
         dump += [['', ':'] + col_IDs]
@@ -67,13 +64,12 @@ class Test():
             for row in sorted_scores:
                 wr.writerow(row)
 
-
     def test_on_set(self, sketch_set):
         if sketch_set == 'test_set':
             sketch_list = self.imdb.test_sketch_list
         elif sketch_set == 'full_train_set':
             sketch_list = self.imdb.full_train_sketch_list
-        elif sketch_set =='limited_train_set':
+        elif sketch_set == 'limited_train_set':
             sketch_list = self.imdb.limited_train_sketch_list
         else:
             sketch_list = None
@@ -92,32 +88,44 @@ class Test():
         vectors = vectors[0:num_sketches]
         return vectors
 
-
     def _get_score(self, v1, v2):
         dist = np.linalg.norm(v1 - v2)
         return dist
 
-    def perform_testing(self):
+    def perform_testing(self, test_mode):
+        group1 = 'test_set'
+
+        if test_mode == 1:
+            group2 = 'limited_train_set'
+        else:
+            group2 = 'full_train_set'
+
         # Testing
-        test_set_vectors = self.test_on_set('test_set')
-        train_set_vectors = self.test_on_set('full_train_set')
+        group1_vectors = self.test_on_set(group1)
+        group2_vectors = self.test_on_set(group2)
 
         print('Computing rank-based accuracy... ')
         row_sketch_list = self.imdb.test_sketch_list
-        if self.limit_search_space:
-            col_sketch_list = self.imdb.limited_sketch_list
+        if test_mode == 1:
+            col_sketch_list = self.imdb.limited_train_sketch_list
         else:
             col_sketch_list = self.imdb.full_train_sketch_list
 
-        num_rows = len(row_sketch_list)
-        num_cols = len(col_sketch_list)
+        num_rows = len(group1_vectors)
+        num_cols = len(group2_vectors)
 
-        ranks = [rank for rank in self.ranks if rank <= num_cols] # filter bad ranks
+        if len(row_sketch_list) != num_rows or len(col_sketch_list) != num_cols:
+            print('Error: score_table sizemismatch')
+            print('Row {0:d} {1:d} Col: {2:d} {3:d}',
+                  len(row_sketch_list), num_rows,
+                  len(col_sketch_list), num_cols)
+
+        ranks = [rank for rank in self.ranks if rank <= num_cols]  # filter bad ranks
         score_table = np.zeros([num_rows, num_cols]).astype('float32')
 
         for i in range(num_rows):
             for j in range(num_cols):
-                score_table[i, j] = self._get_score(test_set_vectors[i], train_set_vectors[j])
+                score_table[i, j] = self._get_score(group1_vectors[i], group2_vectors[j])
 
         # Parse score table and generate accuracy metrics
         # Extract IDs from file names
@@ -147,20 +155,20 @@ class Test():
         decoded = np.empty(original.shape)
 
         gen = self.imdb.get_batch(batch_size, sketch_set)
-        for batch_id in range(int(val_samples/batch_size)):
+        for batch_id in range(int(val_samples / batch_size)):
             x_batch, _ = next(gen)
-            original[batch_id*batch_size:(batch_id+1)*batch_size] = x_batch
-            decoded[batch_id*batch_size:(batch_id+1)*batch_size] = self.net.predict(x_batch)
+            original[batch_id * batch_size:(batch_id + 1) * batch_size] = x_batch
+            decoded[batch_id * batch_size:(batch_id + 1) * batch_size] = self.net.predict(x_batch)
 
         # Ignore the extra sketches introduced by generator
         original = original[0:num_sketches]
         decoded = decoded[0:num_sketches]
 
         for sketch_name, sketch1, sketch2 in zip(sketch_list, original, decoded):
-            sketch1 = (1 + sketch1) * 255 / 2.               # Scale to range [0, 255]
-            sketch1 = 255 - np.clip(sketch1, 0, 255)    # Clip to [0, 255] and invert
-            sketch2 = (1 + sketch2) * 255 / 2.          # Scale to range [0, 255]
-            sketch2 = 255 - np.clip(sketch2, 0, 255)    # Clip to [0, 255] and invert
+            sketch1 = (1 + sketch1) * 255 / 2.  # Scale to range [0, 255]
+            sketch1 = 255 - np.clip(sketch1, 0, 255)  # Clip to [0, 255] and invert
+            sketch2 = (1 + sketch2) * 255 / 2.  # Scale to range [0, 255]
+            sketch2 = 255 - np.clip(sketch2, 0, 255)  # Clip to [0, 255] and invert
             # Place original-sketch on top of decoded-sketch
             sketch = np.concatenate((sketch1, sketch2), axis=1)
             # sketch.shape is (1, wd, wd) at this point
@@ -175,24 +183,26 @@ def dump_train_test_sketch_pairs(X1, ID1, X2, ID2):
         if stripped_id in ID2:
             sketch1 = X1[i]
             sketch2 = X2[ID2.index(stripped_id)]
-            sketch1 = (1 + sketch1) * 255/2.
-            sketch2 = (1 + sketch2) * 255/2.
+            sketch1 = (1 + sketch1) * 255 / 2.
+            sketch2 = (1 + sketch2) * 255 / 2.
             sketch1 = 255 - np.clip(sketch1, 0, 255)
             sketch2 = 255 - np.clip(sketch2, 0, 255)
-            sketch = np.concatenate((sketch2, sketch1), axis=1) # Place Train-sketch on top of test-sketch
+            sketch = np.concatenate((sketch2, sketch1), axis=1)  # Place Train-sketch on top of test-sketch
             # sketch.shape is (1, ht, wd) at this point
-            sketch = sketch.reshape(sketch.shape[1], sketch.shape[1]) # make shape (ht, wd)
+            sketch = sketch.reshape(sketch.shape[1], sketch.shape[1])  # make shape (ht, wd)
             sketch = sketch.astype('uint8')
             cv2.imwrite(os.path.join('temp', id + '_pair.jpg'), sketch)
         else:
             print("Warning: Stripped ID: {0:s} not found in test set. Skipping pair dump.".format(stripped_id))
     exit(0)
 
+
 def set_test_config(common_cfg_file, test_cfg_file):
     with open(common_cfg_file) as f: dataset_config = json.load(f)
     with open(test_cfg_file) as f: test_config = json.load(f)
 
     return dataset_config, test_config
+
 
 def test_net(common_cfg_file, test_cfg_file, test_mode, model_file):
     dataset_args, test_args = set_test_config(common_cfg_file, test_cfg_file)
@@ -205,4 +215,4 @@ def test_net(common_cfg_file, test_cfg_file, test_mode, model_file):
         dataset_args['train_dir'], dataset_args['test_dir'])
 
     # sw.dump_decoded_sketches('test_set')
-    sw.perform_testing()
+    sw.perform_testing(test_mode)
