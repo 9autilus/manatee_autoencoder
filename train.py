@@ -25,10 +25,13 @@ class SolverWrapper():
         if self.retrain:
             # Use pre-trained model_file
             print('Reading model from disk: ', model_file)
-            self.net = load_model(model_file)
+            self.autoencoder = load_model(model_file)
         else:
-            self.net, _ = create_network(self.input_dim)
+            self.autoencoder, self.encoder = create_network(self.input_dim)
             self.initial_epoch = 0
+        # print(self.encoder.summary())
+        print(self.autoencoder.summary())
+        print('Encoded feature shape: ', self.encoder.output_shape)
 
     def _dump_history(self, history, val_set_present, log_file_name):
         f = open(log_file_name, "w")
@@ -70,10 +73,12 @@ class SolverWrapper():
         self.imdb.validate_dataset(self.batch_size)
 
         # Create check point callback
-        checkpointer = ModelCheckpoint(filepath=self.model_file,
+        autoencoder_file = self.model_file.split('.')[0] + '_ae.' + self.model_file.split('.')[1]
+        encoder_file = self.model_file.split('.')[0] + '_e.' + self.model_file.split('.')[1]
+        checkpointer = ModelCheckpoint(filepath=autoencoder_file,
                                        monitor='val_loss', verbose=1, save_best_only=True)
 
-        hist = self.net.fit_generator(
+        hist = self.autoencoder.fit_generator(
             self.imdb.get_batch(batch_size, sketch_set='train_set'),
             samples_per_epoch=num_train_sample,
             nb_epoch=self.nb_epoch,
@@ -82,8 +87,10 @@ class SolverWrapper():
             callbacks=[checkpointer])
 
         self._dump_history(hist.history, True, 'history.log')
-        print('Training complete. Saved model as: ', self.model_file)
+        print('Training complete. Saved autoencoder as: ', autoencoder_file)
 
+        self.encoder.save(encoder_file)
+        print('Training complete. Saved encoder as: ', encoder_file)
 
 def set_train_config(common_cfg_file, train_cfg_file, train_mode):
     with open(common_cfg_file) as f: dataset_config = json.load(f)

@@ -9,6 +9,7 @@ import os
 
 from dataset import Dataset
 from eval import eval_score_table
+from model_def import load_encoder, load_autoencoder
 
 
 class Test():
@@ -22,9 +23,11 @@ class Test():
         self.dump_score_table = True  # For debugging
 
         # Use pre-trained model_file
-        print('Reading model from disk: ', model_file)
-        self.net = load_model(model_file)
-        return
+        self.encoder = load_encoder(model_file)
+        self.autoencoder = load_autoencoder(model_file)
+        print(self.encoder.summary())
+        #print(self.autoencoder.summary())
+        print('Encoded feature shape: ', self.encoder.output_shape)
 
     def _dump_score_table(self, score_table, row_IDs, col_IDs):
         import sys
@@ -78,18 +81,18 @@ class Test():
 
         num_sketches = len(sketch_list)
         batch_size = self.batch_size
-        val_samples = int(np.ceil(num_sketches / batch_size)) * batch_size
+        num_samples = int(np.ceil(num_sketches / batch_size)) * batch_size
 
-        vectors = self.net.predict_generator(
+        vectors = self.encoder.predict_generator(
             self.imdb.get_batch(batch_size, sketch_set=sketch_set),
-            val_samples=val_samples)
+            val_samples=num_samples)
 
         # Ignore the extra sketches introduced by generator
         vectors = vectors[0:num_sketches]
         return vectors
 
     def _get_score(self, v1, v2):
-        dist = np.linalg.norm(v1 - v2)
+        dist = np.linalg.norm(v1.flatten() - v2.flatten())
         return dist
 
     def perform_testing(self, test_mode):
@@ -115,10 +118,9 @@ class Test():
         num_cols = len(group2_vectors)
 
         if len(row_sketch_list) != num_rows or len(col_sketch_list) != num_cols:
-            print('Error: score_table sizemismatch')
+            print('Error: score_table size mismatch')
             print('Row {0:d} {1:d} Col: {2:d} {3:d}',
-                  len(row_sketch_list), num_rows,
-                  len(col_sketch_list), num_cols)
+                  len(row_sketch_list), num_rows, len(col_sketch_list), num_cols)
 
         ranks = [rank for rank in self.ranks if rank <= num_cols]  # filter bad ranks
         score_table = np.zeros([num_rows, num_cols]).astype('float32')
@@ -158,7 +160,7 @@ class Test():
         for batch_id in range(int(val_samples / batch_size)):
             x_batch, _ = next(gen)
             original[batch_id * batch_size:(batch_id + 1) * batch_size] = x_batch
-            decoded[batch_id * batch_size:(batch_id + 1) * batch_size] = self.net.predict(x_batch)
+            decoded[batch_id * batch_size:(batch_id + 1) * batch_size] = self.autoencoder.predict(x_batch)
 
         # Ignore the extra sketches introduced by generator
         original = original[0:num_sketches]

@@ -9,6 +9,7 @@ def plot_model(model):
 
 def compile_network(model):
     rms = RMSprop(lr=0.001, decay=0.1)
+    #model.compile(loss='binary_crossentropy', optimizer=rms, metrics=['accuracy'])
     model.compile(loss='mse', optimizer=rms)
     return model
 
@@ -31,30 +32,49 @@ def create_network(input_dim):
     x = UpSampling2D((2, 2))(x)
     x = Convolution2D(16, 3, 3, activation='relu', border_mode='same')(x)
     x = UpSampling2D((2, 2))(x)
-    decoded = Convolution2D(1, 3, 3, activation='tanh', border_mode='same')(x)
+
+    if 0:
+        x = Convolution2D(1, 3, 3, activation='sigmoid', border_mode='same')(x)
+        decoded = Flatten()(x)
+    elif 0:
+        decoded = Convolution2D(1, 3, 3, activation='sigmoid', border_mode='same')(x)        
+    else:    
+        decoded = Convolution2D(1, 3, 3, activation='tanh', border_mode='same')(x)
+
     # tanh non-linearity is required since input is in range (-1, +1)
 
     model = Model(input_img, decoded)
+    encoder = Model(input_img, encoded)
     model = compile_network(model)
-
-    for i, l in enumerate(model.layers):
-        if l.output == encoded:
-            encode_layer_id = i
-
-    print(model.summary())
 
     if 0:
         plot_model(model)
 
-    return model, encode_layer_id
+    return model, encoder
 
 
-def get_test_model(model_file, input_dim):
-    _, encode_layer_id = create_network(input_dim)
+def load_half_model(model_file, input_dim):
+    m_fresh, encoder, encode_layer_id = create_network(input_dim)
     trained_model = load_model(model_file)
 
-    m = Model(trained_model.layers[0].input, trained_model.layers[encode_layer_id].output)
+    if 0:
+        m = Model(trained_model.layers[0].input, trained_model.layers[encode_layer_id].output)
+    else:
+        x = Flatten()(trained_model.layers[encode_layer_id].output)
+        m = Model(trained_model.layers[0].input, x)
+    # m = Model(m_fresh.layers[0].input, m_fresh.layers[encode_layer_id].output)
+
+    m.save('test2.h5')
+
+    for lyr in m.layers:
+        lyr.trainable = False
+
     return m
 
-def get_trained_model(model_file):
-    m = load_model(model_file)
+def load_autoencoder(model_file):
+    return load_model(model_file.split('.')[0] + '_ae.' + model_file.split('.')[1])
+
+def load_encoder(model_file):
+    m = load_model(model_file.split('.')[0] + '_e.' + model_file.split('.')[1])
+    compile_network(m)
+    return m

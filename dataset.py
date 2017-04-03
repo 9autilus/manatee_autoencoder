@@ -40,11 +40,16 @@ class Dataset():
             sketch = 255 - sketch # Make background zero by inverting
             sketch = sketch.astype('float32')
 
-            # Some sketches a greyish background. Eliminate it.
-            # sketch[sketch < 30] = 0
+            if 0:
+                sketch[sketch < 127] = 0.
+                sketch[sketch >= 127] = 1.
+            else:
+                # Some sketches a greyish background. Eliminate it.
+                # sketch[sketch < 30] = 0
 
-            # Bring the image data to -1 to +1 range
-            sketch = (sketch * 2)/255. - 1
+                # Bring the image data to -1 to +1 range
+                sketch = (sketch * 2)/255. - 1
+
             return sketch
         else:
             print('Unable to open ', sketch_path, ' Skipping.')
@@ -169,7 +174,10 @@ class Dataset():
                 src_idx = 0
             if dst_idx >= batch_size:
                 dst_idx = 0
-                yield X, X
+                if 0:
+                    yield X, X.reshape(X.shape[0], -1)
+                else:
+                    yield X, X
 
     # Function definition taken from keras source code
     def _apply_affine_distortion(self, x):
