@@ -19,6 +19,8 @@ class Dataset():
 
         self.training_ignore_list_file = os.path.join('resources', 'training_ignore_list.txt')
 
+        self.use_binary_sketches = False
+
         # Prepare sketch lists
         self.full_train_sketch_list = self._get_sketch_list('train')
         self._print_dataset_config()
@@ -40,7 +42,7 @@ class Dataset():
             sketch = 255 - sketch # Make background zero by inverting
             sketch = sketch.astype('float32')
 
-            if 0:
+            if self.use_binary_sketches:
                 sketch[sketch < 127] = 0.
                 sketch[sketch >= 127] = 1.
             else:
@@ -147,6 +149,7 @@ class Dataset():
             sketch_dir = self.train_dir
             sketch_list = self.limited_train_sketch_list
         else:
+            sketch_dir = None
             print('Error: Weird "sketch_set" arg to get_batch():{0:s}'.format(sketch_set))
             exit(0)
 

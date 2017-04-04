@@ -4,9 +4,8 @@ from dataset import Dataset
 from keras.callbacks import ModelCheckpoint, Callback
 from keras.models import load_model
 import numpy as np
-import random
-import os
 import json
+import os
 
 
 class SolverWrapper():
@@ -27,7 +26,7 @@ class SolverWrapper():
             print('Reading model from disk: ', model_file)
             self.autoencoder = load_model(model_file)
         else:
-            self.autoencoder, self.encoder = create_network(self.input_dim)
+            self.autoencoder, self.encoder = create_network(self.input_dim, self.imdb.use_binary_sketches)
             self.initial_epoch = 0
         # print(self.encoder.summary())
         print(self.autoencoder.summary())
@@ -78,18 +77,37 @@ class SolverWrapper():
         checkpointer = ModelCheckpoint(filepath=autoencoder_file,
                                        monitor='val_loss', verbose=1, save_best_only=True)
 
-        hist = self.autoencoder.fit_generator(
-            self.imdb.get_batch(batch_size, sketch_set='train_set'),
-            samples_per_epoch=num_train_sample,
-            nb_epoch=self.nb_epoch,
-            validation_data=self.imdb.get_batch(batch_size, sketch_set='val_set'),
-            nb_val_samples=num_val_sample,
-            callbacks=[checkpointer])
+        if 1:
+            sketch_list = self.imdb.full_train_sketch_list
+            sketch_dir = self.imdb.train_dir
+            X_train = np.zeros([len(sketch_list), 1, self.imdb.ht, self.imdb.wd])
+            for i, sketch_name in enumerate(sketch_list):
+                X_train[i] = self.imdb._get_sketch(os.path.join(sketch_dir, sketch_name)).reshape(1, self.imdb.ht, self.imdb.wd)
+
+            sketch_list = self.imdb.val_sketch_list
+            sketch_dir = self.imdb.train_dir
+            X_val = np.zeros([len(sketch_list), 1, self.imdb.ht, self.imdb.wd])
+            for i, sketch_name in enumerate(sketch_list):
+                X_val[i] = self.imdb._get_sketch(os.path.join(sketch_dir, sketch_name)).reshape(1, self.imdb.ht, self.imdb.wd)
+
+            hist = self.autoencoder.fit(X_train, X_train,
+                nb_epoch=self.nb_epoch,
+                validation_data=(X_val, X_val),
+                callbacks=[checkpointer])
+        else:
+            hist = self.autoencoder.fit_generator(
+                self.imdb.get_batch(batch_size, sketch_set='train_set'),
+                samples_per_epoch=num_train_sample,
+                nb_epoch=self.nb_epoch,
+                validation_data=self.imdb.get_batch(batch_size, sketch_set='val_set'),
+                nb_val_samples=num_val_sample,
+                callbacks=[checkpointer])
 
         self._dump_history(hist.history, True, 'history.log')
         print('Training complete. Saved autoencoder as: ', autoencoder_file)
 
         self.encoder.save(encoder_file)
+
         print('Training complete. Saved encoder as: ', encoder_file)
 
 def set_train_config(common_cfg_file, train_cfg_file, train_mode):

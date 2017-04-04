@@ -11,7 +11,6 @@ from dataset import Dataset
 from eval import eval_score_table
 from model_def import load_encoder, load_autoencoder
 
-
 class Test():
     def __init__(self, imdb, model_file, batch_size, train_dir, test_dir):
         self.imdb = imdb
@@ -23,7 +22,7 @@ class Test():
         self.dump_score_table = True  # For debugging
 
         # Use pre-trained model_file
-        self.encoder = load_encoder(model_file)
+        self.encoder = load_encoder(model_file, self.imdb.use_binary_sketches)
         self.autoencoder = load_autoencoder(model_file)
         print(self.encoder.summary())
         #print(self.autoencoder.summary())
@@ -69,26 +68,29 @@ class Test():
 
     def test_on_set(self, sketch_set):
         if sketch_set == 'test_set':
+            sketch_dir = self.test_dir
             sketch_list = self.imdb.test_sketch_list
         elif sketch_set == 'full_train_set':
+            sketch_dir = self.imdb.train_dir
             sketch_list = self.imdb.full_train_sketch_list
         elif sketch_set == 'limited_train_set':
+            sketch_dir = self.imdb.train_dir
             sketch_list = self.imdb.limited_train_sketch_list
         else:
+            sketch_dir = None
             sketch_list = None
             print('Error: Weird "sketch_set" arg:{0:s}'.format(sketch_set))
             exit(0)
 
         num_sketches = len(sketch_list)
         batch_size = self.batch_size
-        num_samples = int(np.ceil(num_sketches / batch_size)) * batch_size
 
-        vectors = self.encoder.predict_generator(
-            self.imdb.get_batch(batch_size, sketch_set=sketch_set),
-            val_samples=num_samples)
+        X = np.zeros([num_sketches, 1, self.imdb.ht, self.imdb.wd])
+        for i, sketch_name in enumerate(sketch_list):
+            X[i] = self.imdb._get_sketch(os.path.join(sketch_dir, sketch_name)).reshape(1, self.imdb.ht, self.imdb.wd)
 
-        # Ignore the extra sketches introduced by generator
-        vectors = vectors[0:num_sketches]
+        vectors = self.encoder.predict(X, batch_size=batch_size)
+
         return vectors
 
     def _get_score(self, v1, v2):
@@ -127,7 +129,7 @@ class Test():
 
         for i in range(num_rows):
             for j in range(num_cols):
-                score_table[i, j] = self._get_score(group1_vectors[i], group2_vectors[j])
+                score_table[i][j] = self._get_score(group1_vectors[i], group2_vectors[j])
 
         # Parse score table and generate accuracy metrics
         # Extract IDs from file names
@@ -167,10 +169,14 @@ class Test():
         decoded = decoded[0:num_sketches]
 
         for sketch_name, sketch1, sketch2 in zip(sketch_list, original, decoded):
-            sketch1 = (1 + sketch1) * 255 / 2.  # Scale to range [0, 255]
-            sketch1 = 255 - np.clip(sketch1, 0, 255)  # Clip to [0, 255] and invert
-            sketch2 = (1 + sketch2) * 255 / 2.  # Scale to range [0, 255]
-            sketch2 = 255 - np.clip(sketch2, 0, 255)  # Clip to [0, 255] and invert
+            if self.imdb.use_binary_sketches:
+                sketch1 = (1. - sketch1) * 255
+                sketch2 = (1. - sketch2) * 255
+            else:
+                sketch1 = (1 + sketch1) * 255 / 2.  # Scale to range [0, 255]
+                sketch1 = 255 - np.clip(sketch1, 0, 255)  # Clip to [0, 255] and invert
+                sketch2 = (1 + sketch2) * 255 / 2.  # Scale to range [0, 255]
+                sketch2 = 255 - np.clip(sketch2, 0, 255)  # Clip to [0, 255] and invert
             # Place original-sketch on top of decoded-sketch
             sketch = np.concatenate((sketch1, sketch2), axis=1)
             # sketch.shape is (1, wd, wd) at this point
@@ -216,5 +222,5 @@ def test_net(common_cfg_file, test_cfg_file, test_mode, model_file):
         imdb, model_file, test_args['batch_size'],
         dataset_args['train_dir'], dataset_args['test_dir'])
 
-    # sw.dump_decoded_sketches('test_set')
+    sw.dump_decoded_sketches('test_set')
     sw.perform_testing(test_mode)
